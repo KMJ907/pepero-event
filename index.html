@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>이벤트 응모 페이지</title>
+<style>
+  body {
+    font-family: "Pretendard", sans-serif;
+    background: #f9fafb;
+    color: #333;
+    text-align: center;
+    padding: 40px;
+  }
+  .container {
+    max-width: 500px;
+    margin: 0 auto;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    padding: 30px;
+  }
+  input[type=text], input[type=tel] {
+    width: 90%;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    margin: 10px 0;
+    font-size: 16px;
+  }
+  input[type=checkbox] { margin-right: 8px; }
+  button {
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 16px;
+    cursor: pointer;
+    margin-top: 10px;
+  }
+  button:hover { background: #0056b3; }
+  .admin-link { margin-top: 20px; font-size: 14px; color: #777; cursor: pointer; }
+  .hidden { display: none; }
+  table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+  th, td { border: 1px solid #ddd; padding: 6px; text-align: center; }
+  th { background: #f3f4f6; }
+  .admin-btns button { margin: 5px 0; background: #4b5563; }
+</style>
+</head>
+<body>
+
+<div class="container" id="apply-section">
+  <h2>🎉 빼빼로 이벤트 응모 🎉</h2>
+  <p>모든 항목을 작성 후 응모 버튼을 눌러주세요.</p>
+
+  <input type="text" id="nickname" placeholder="닉네임(이름)">
+  <input type="text" id="extraInfo" placeholder="관리자에게 한 마디!">
+  <input type="tel" id="contact" placeholder="연락처 입력">
+
+  <label><input type="checkbox" id="agree"> 개인정보 수집 및 이용에 동의합니다.</label>
+  <p style="font-size:0.8rem; color:#555; margin-top:-6px;">
+    수집항목: 연락처<br>
+    이용목적: 이벤트 진행 및 경품 발송<br>
+    보유기간: 당첨자 발표 후 3일
+  </p>
+
+  <button id="submit-btn">응모하기</button>
+  <p id="message"></p>
+  <p class="admin-link" id="admin-link">🔐 관리자 전용</p>
+</div>
+
+<!-- 관리자 패널 -->
+<div class="container hidden" id="admin-section">
+  <h3>관리자 페이지</h3>
+  <table id="entry-table">
+    <thead><tr><th>닉네임</th><th>관리자에게 한 마디!</th><th>연락처</th><th>응모시간</th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <div class="admin-btns">
+    <button id="download-csv">CSV 다운로드</button>
+    <button id="clear-data">전체 초기화</button>
+    <button onclick="hideAdmin()">닫기</button>
+  </div>
+</div>
+
+<script>
+const ADMIN_CODE = "toddlf*83*";
+
+// 로컬 스토리지 불러오기
+let entries = JSON.parse(localStorage.getItem("entries") || "[]");
+let hasApplied = localStorage.getItem("hasApplied") === "true";
+
+const submitBtn = document.getElementById("submit-btn");
+const message = document.getElementById("message");
+const adminLink = document.getElementById("admin-link");
+const adminSection = document.getElementById("admin-section");
+const applySection = document.getElementById("apply-section");
+
+// 응모 버튼
+submitBtn.addEventListener("click", () => {
+  const nickname = document.getElementById("nickname").value.trim();
+  const extraInfo = document.getElementById("extraInfo").value.trim();
+  const contact = document.getElementById("contact").value.trim();
+  const agree = document.getElementById("agree").checked;
+
+  if (!nickname || !contact) return message.textContent = "필수 항목을 입력하세요.";
+  if (!agree) return message.textContent = "개인정보 수집 동의가 필요합니다.";
+  if (hasApplied) return message.textContent = "이미 응모하셨습니다!";
+
+  const now = new Date().toLocaleString();
+  entries.push({ nickname, extraInfo, contact, time: now });
+  localStorage.setItem("entries", JSON.stringify(entries));
+  localStorage.setItem("hasApplied", "true");
+  hasApplied = true;
+  message.textContent = "응모가 완료되었습니다!";
+});
+
+// 관리자 접근
+adminLink.addEventListener("click", () => {
+  const code = prompt("관리자 코드를 입력하세요:");
+  if (code === ADMIN_CODE) showAdmin();
+  else alert("코드가 올바르지 않습니다.");
+});
+
+function showAdmin() {
+  applySection.classList.add("hidden");
+  adminSection.classList.remove("hidden");
+  refreshTable();
+}
+
+function hideAdmin() {
+  adminSection.classList.add("hidden");
+  applySection.classList.remove("hidden");
+}
+
+// 테이블 갱신
+function refreshTable() {
+  const tbody = document.querySelector("#entry-table tbody");
+  tbody.innerHTML = entries.map(e => `<tr>
+    <td>${e.nickname}</td>
+    <td>${e.extraInfo}</td>
+    <td>${e.contact}</td>
+    <td>${e.time}</td>
+  </tr>`).join("");
+}
+
+// CSV 다운로드
+document.getElementById("download-csv").addEventListener("click", () => {
+  if (entries.length === 0) return alert("데이터가 없습니다.");
+  const csv = "닉네임,관리자에게 한 마디,연락처,응모시간\n" +
+    entries.map(e => `${e.nickname},${e.extraInfo},${e.contact},${e.time}`).join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "응모자_목록.csv";
+  a.click();
+});
+
+// 전체 초기화
+document.getElementById("clear-data").addEventListener("click", () => {
+  if (!confirm("모든 응모 데이터를 초기화하시겠습니까?")) return;
+  entries = [];
+  localStorage.removeItem("entries");
+  localStorage.removeItem("hasApplied");
+  refreshTable();
+  alert("데이터가 초기화되었습니다!");
+});
+
+// 페이지 로드 시 이미 응모한 경우
+if (hasApplied) message.textContent = "이미 응모하셨습니다!";
+</script>
+
+</body>
+</html>
